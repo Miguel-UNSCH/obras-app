@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
-import {AppContext} from '../context/AppContext'; // Ajusta la ruta según tu estructura de archivos
+import {AppContext} from '../context/AppContext';
 import {authLogin} from '../actions/auth';
 
 const LoginScreen = () => {
