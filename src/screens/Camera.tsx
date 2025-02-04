@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useContext} from 'react';
 import {
   View,
   Text,
@@ -6,26 +6,27 @@ import {
   Pressable,
   FlatList,
   Image,
+  Alert,
 } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
-import {CameraAdapter, PhotoDetail} from '../config/adapters/camera.adapter';
+import {CameraAdapter} from '../config/adapters/camera.adapter';
+import {AppContext} from '../context/AppContext';
+import {PhotoDetail, uploadPhotosToServer} from '../actions/upload';
 
 const LOCAL_STORAGE_KEY = 'my_photos';
 
 const Camera = () => {
+  const {userData} = useContext(AppContext);
   const [photos, setPhotos] = useState<PhotoDetail[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
-  // 1. Al montar el componente, cargamos las fotos existentes en local.
   useEffect(() => {
     loadLocalPhotos();
   }, []);
 
-  // 2. Suscribirse a los cambios en la conexión a internet.
   useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener((state) => {
+    const unsubscribe = NetInfo.addEventListener(state => {
       setIsConnected(!!state.isConnected);
     });
     return () => {
@@ -33,7 +34,6 @@ const Camera = () => {
     };
   }, []);
 
-  // Cargar fotos desde AsyncStorage
   const loadLocalPhotos = async () => {
     try {
       const savedPhotos = await AsyncStorage.getItem(LOCAL_STORAGE_KEY);
@@ -45,26 +45,31 @@ const Camera = () => {
     }
   };
 
-  // Guardar fotos en AsyncStorage
   const storePhotosLocally = async (photosToStore: PhotoDetail[]) => {
     try {
-      await AsyncStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(photosToStore));
-      console.log('Fotos guardadas localmente:', photosToStore.length);
+      await AsyncStorage.setItem(
+        LOCAL_STORAGE_KEY,
+        JSON.stringify(photosToStore),
+      );
     } catch (error) {
       console.error('Error al guardar fotos localmente:', error);
     }
   };
 
-  // Tomar foto y guardarla localmente
   const takePicture = async () => {
     try {
       const photo = await CameraAdapter.takePicture();
       if (photo) {
-        // Agregamos la foto al estado
-        const updatedPhotos = [...photos, photo];
+        const formattedPhoto: PhotoDetail = {
+          ...photo,
+          timestamp: Number(photo.timestamp),
+          latitude: photo.latitude ?? undefined,
+          longitude: photo.longitude ?? undefined,
+        };
+
+        const updatedPhotos: PhotoDetail[] = [...photos, formattedPhoto];
         setPhotos(updatedPhotos);
 
-        // Guardamos las fotos en AsyncStorage para persistir
         await storePhotosLocally(updatedPhotos);
       } else {
         console.log('No se capturó ninguna foto.');
@@ -74,46 +79,40 @@ const Camera = () => {
     }
   };
 
-  // Subir fotos al servidor (simulación)
-  const uploadPhotosToServer = async (photosToUpload: PhotoDetail[]) => {
-    // Aquí iría tu lógica real para subir las fotos a tu servidor
-    // Por ejemplo, con fetch o axios, enviando los datos en JSON o archivos.
-    // Este ejemplo simula un retraso de 2 segundos.
-    console.log('Iniciando subida de fotos al servidor...');
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    console.log('Fotos subidas exitosamente al servidor:', photosToUpload.length);
-  };
-
-  // Manejar botón "Guardar"
-  //  - Sube las fotos al servidor.
-  //  - Si es exitoso, limpia almacenamiento local y estado.
   const handleSave = async () => {
-    if (!photos.length) return;
+    if (!photos.length) {
+      return;
+    }
+
+    if (!userData || !userData.propietario_id || !userData.cui) {
+      Alert.alert('Error', 'No se encontró información del usuario.');
+      return;
+    }
+
     if (isConnected) {
-      try {
-        await uploadPhotosToServer(photos);
-        // Si la subida es exitosa, eliminamos las fotos locales
+      const success = await uploadPhotosToServer(
+        photos,
+        userData.propietario_id,
+        userData.cui,
+      );
+      if (success) {
         await AsyncStorage.removeItem(LOCAL_STORAGE_KEY);
         setPhotos([]);
         console.log('Fotos eliminadas de local tras la subida exitosa.');
-      } catch (error) {
-        console.error('Error al subir fotos al servidor:', error);
       }
     } else {
-      console.log('No hay conexión; no se subirán las fotos ahora.');
+      Alert.alert(
+        'Sin conexión',
+        'No hay conexión a internet. Las fotos se guardarán localmente.',
+      );
     }
   };
 
-  // Render de cada tarjeta en el FlatList
   const renderPhoto = ({item}: {item: PhotoDetail}) => (
     <View style={styles.card}>
       <Image source={{uri: item.uri}} style={styles.image} />
-      <Text style={styles.details}>
-        Latitud: {item.latitude !== null ? item.latitude : 'N/A'}
-      </Text>
-      <Text style={styles.details}>
-        Longitud: {item.longitude !== null ? item.longitude : 'N/A'}
-      </Text>
+      <Text style={styles.details}>Latitud: {item.latitude ?? 'N/A'}</Text>
+      <Text style={styles.details}>Longitud: {item.longitude ?? 'N/A'}</Text>
       <Text style={styles.details}>
         Fecha y Hora: {new Date(item.timestamp).toLocaleString()}
       </Text>
@@ -122,7 +121,6 @@ const Camera = () => {
 
   return (
     <View style={styles.container}>
-      {/* Listado de fotos en tarjetas */}
       <FlatList
         data={photos}
         keyExtractor={(item, index) => `${item.uri}-${index}`}
@@ -130,21 +128,17 @@ const Camera = () => {
         contentContainerStyle={styles.list}
       />
 
-      {/* Botón para tomar fotos */}
       <Pressable style={styles.cameraButton} onPress={takePicture}>
         <Text style={styles.cameraText}>Tomar una foto</Text>
       </Pressable>
 
-      {/* Botón para "Guardar" (subir) */}
-      {/* Se habilita solo si hay fotos y conexión a internet */}
       <Pressable
         style={[
           styles.saveButton,
           (photos.length === 0 || !isConnected) && styles.disabledButton,
         ]}
         onPress={handleSave}
-        disabled={photos.length === 0 || !isConnected}
-      >
+        disabled={photos.length === 0 || !isConnected}>
         <Text style={styles.saveButtonText}>Guardar</Text>
       </Pressable>
     </View>
