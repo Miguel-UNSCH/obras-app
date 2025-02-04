@@ -1,4 +1,4 @@
-import React, {useState, useContext} from 'react';
+import React, { useState, useContext } from 'react';
 import {
   View,
   Text,
@@ -9,20 +9,17 @@ import {
   StatusBar,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {useNavigation} from '@react-navigation/native';
-import {AppContext} from '../context/AppContext'; // Ajusta la ruta según tu estructura de archivos
-import {authLogin} from '../actions/auth';
+import { useNavigation } from '@react-navigation/native';
+import { AppContext } from '../context/AppContext';
 
 const LoginScreen = () => {
   const navigation = useNavigation();
-  const {setUserData, setToken} = useContext(AppContext);
+  const { login, isLoading } = useContext(AppContext);
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const onLogin = async () => {
     if (!username || !password) {
@@ -30,38 +27,20 @@ const LoginScreen = () => {
       return;
     }
 
-    setIsLoading(true);
     try {
-      const data = await authLogin(username, password);
-
-      console.log(data);
-
-      if (data) {
-        // Guardar token en AsyncStorage
-        await AsyncStorage.setItem('token', data.token);
-
-        // Actualizar el estado global con los datos del usuario
-        setToken(data.token);
-        setUserData(data.user);
-
-        // Navegar a la pantalla principal
-        navigation.navigate('Main' as never);
-      } else {
-        setErrorMessage(data.message || 'Error de autenticación.');
-      }
-    } catch (error) {
-      setErrorMessage('Ocurrió un error. Inténtalo nuevamente.');
-    } finally {
-      setIsLoading(false);
+      await login(username, password);
+      navigation.navigate('Main' as never);
+    } catch (error: any) {
+      setErrorMessage(error.message || 'Error de autenticación.');
     }
   };
 
   const handleInputChange = (
     setter: React.Dispatch<React.SetStateAction<string>>,
-    value: string,
+    value: string
   ) => {
     setter(value);
-    if (errorMessage) {
+    if (errorMessage && username && password) {
       setErrorMessage('');
     }
   };
@@ -77,16 +56,14 @@ const LoginScreen = () => {
       />
       <Text style={styles.title}>Inicia sesión</Text>
 
-      {errorMessage ? (
-        <Text style={styles.errorText}>{errorMessage}</Text>
-      ) : null}
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
 
       <TextInput
         style={styles.input}
         placeholder="Usuario"
         placeholderTextColor="#aaa"
         value={username}
-        onChangeText={value => handleInputChange(setUsername, value)}
+        onChangeText={(value) => handleInputChange(setUsername, value)}
       />
 
       <View style={styles.passwordContainer}>
@@ -95,22 +72,20 @@ const LoginScreen = () => {
           placeholder="Contraseña"
           placeholderTextColor="#aaa"
           value={password}
-          onChangeText={value => handleInputChange(setPassword, value)}
+          onChangeText={(value) => handleInputChange(setPassword, value)}
           secureTextEntry={!isPasswordVisible}
         />
         <Pressable
           onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-          style={styles.togglePasswordButton}>
+          style={styles.togglePasswordButton}
+        >
           <Text style={styles.togglePasswordText}>
             {isPasswordVisible ? 'Ocultar' : 'Mostrar'}
           </Text>
         </Pressable>
       </View>
 
-      <Pressable
-        style={styles.loginButton}
-        onPress={onLogin}
-        disabled={isLoading}>
+      <Pressable style={styles.loginButton} onPress={onLogin} disabled={isLoading}>
         {isLoading ? (
           <ActivityIndicator color="#fff" />
         ) : (

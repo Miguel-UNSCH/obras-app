@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect, useContext, useCallback} from 'react';
 import {
   View,
   Text,
@@ -8,104 +8,65 @@ import {
   Modal,
   StyleSheet,
   Pressable,
+  ActivityIndicator,
 } from 'react-native';
-import DatePicker, {DateTimePickerEvent} from '@react-native-community/datetimepicker';
+import DatePicker, {
+  DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import {DateTime, Settings} from 'luxon';
 import {useNavigation} from '@react-navigation/native';
+import {AppContext} from '../context/AppContext';
 
 Settings.defaultLocale = 'es';
 
 interface ImageItem {
   id: string;
-  uri: string;
-  data: {
-    latitude: number;
-    longitude: number;
-    date: string;
-  };
+  url: string;
+  latitud: number | null;
+  longitud: number | null;
+  date: string;
 }
 
 const Gallery: React.FC = () => {
   const navigation = useNavigation();
-
-  // Función para formatear la fecha y hora con Luxon
-  const formatDateTime = (dateStr: string) => {
-    const dt = DateTime.fromISO(dateStr);
-    // Si la fecha es válida, formateamos. Si no, mostramos el string tal cual.
-    return dt.isValid ? dt.toFormat("d 'de' LLL yyyy, HH:mm") : dateStr;
-  };
-
-  // Función para verificar si la fecha seleccionada es hoy
-  const isToday = (date: Date) => {
-    const now = new Date();
-    return (
-      date.getDate() === now.getDate() &&
-      date.getMonth() === now.getMonth() &&
-      date.getFullYear() === now.getFullYear()
-    );
-  };
+  const {userData, isInArea} = useContext(AppContext);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
-
-  // Lista de imágenes de prueba
-  const [images] = useState<ImageItem[]>([
-    {
-      id: '1',
-      uri: 'https://www.hermanosotero.com/que-es-una-obra-civil_img81647t1.jpg',
-      data: {
-        latitude: -14.76532,
-        longitude: -73.12234,
-        date: '2024-02-01',
-      },
-    },
-    {
-      id: '2',
-      uri: 'https://www.grupopazos.es/wp-content/uploads/2022/11/tipos-de-obras-de-construccion.jpg',
-      data: {
-        latitude: -14.76532,
-        longitude: -73.12234,
-        date: '2024-02-01',
-      },
-    },
-    {
-      id: '3',
-      uri: 'https://larepublica.cronosmedia.glr.pe/migration/images/LR5CTDHRV5DA3M6KIFR5D3Q4QM.jpg',
-      data: {
-        latitude: -14.76532,
-        longitude: -73.12234,
-        date: '2024-02-01',
-      },
-    },
-    {
-      id: '4',
-      uri: 'https://www.efreyre.com/wp-content/uploads/2019/04/Remote-Location-Constructions-Sites.jpg',
-      data: {
-        latitude: -14.76532,
-        longitude: -73.12234,
-        date: '2024-02-01',
-      },
-    },
-    {
-      id: '5',
-      uri: 'https://encuentro.pe/wp-content/uploads/2023/10/IMG_2926-1024x683.jpg',
-      data: {
-        latitude: -14.76532,
-        longitude: -73.12234,
-        date: '2024-02-01',
-      },
-    },
-  ]);
-
+  const [images, setImages] = useState<ImageItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
 
-  const handleImageClick = (image: ImageItem) => {
-    setSelectedImage(image);
-    setModalVisible(true);
-  };
+  const fetchImages = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(
+        'https://geobras.regionayacucho.gob.pe/api/images',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            id: userData?.propietario_id,
+            cui: userData?.cui,
+            date: DateTime.fromJSDate(selectedDate).toFormat('yyyy-MM-dd'),
+          }),
+        },
+      );
+      const data: ImageItem[] = await response.json();
+      setImages(data);
+    } catch (error) {
+      console.error('Error fetching images:', error);
+    }
+    setLoading(false);
+  }, [userData?.propietario_id, userData?.cui, selectedDate]);
 
-  // Manejador de la fecha
+  useEffect(() => {
+    fetchImages();
+  }, [fetchImages]);
+
   const handleDateChange = (event: DateTimePickerEvent, date?: Date) => {
     setShowDatePicker(false);
     if (date) {
@@ -113,8 +74,12 @@ const Gallery: React.FC = () => {
     }
   };
 
+  const handleImageClick = (image: ImageItem) => {
+    setSelectedImage(image);
+    setModalVisible(true);
+  };
+
   const handleAddImage = () => {
-    // Navegación a tu cámara
     navigation.navigate('Camera' as never);
   };
 
@@ -122,13 +87,12 @@ const Gallery: React.FC = () => {
     <TouchableOpacity
       onPress={() => handleImageClick(item)}
       style={styles.imageTouchable}>
-      <Image source={{uri: item.uri}} style={styles.image} />
+      <Image source={{uri: item.url}} style={styles.image} />
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      {/* Selector de fecha */}
       <View style={styles.datePickerContainer}>
         <TouchableOpacity onPress={() => setShowDatePicker(true)}>
           <Text style={styles.dateText}>
@@ -147,29 +111,26 @@ const Gallery: React.FC = () => {
         )}
       </View>
 
-      {/* Galería de imágenes */}
-      <FlatList
-        data={images}
-        renderItem={renderImageItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        style={styles.gallery}
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color="#6a23de" />
+      ) : (
+        <FlatList
+          data={images}
+          renderItem={renderImageItem}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          style={styles.gallery}
+        />
+      )}
 
-      {/* Botón para agregar nuevas imágenes */}
       <Pressable
         onPress={handleAddImage}
-        style={[
-          styles.buttonAdd,
-          !isToday(selectedDate) && styles.disabledButton, // Agrega estilo si no es hoy
-        ]}
-        disabled={!isToday(selectedDate)} // Deshabilita el Pressable si no es hoy
-      >
+        style={[styles.buttonAdd, !isInArea && styles.disabledButton]}
+        disabled={!isInArea}>
         <Text style={styles.textButton}>Agregar imagen</Text>
       </Pressable>
 
-      {/* Modal para ver detalles de la imagen */}
-      {modalVisible && (
+      {modalVisible && selectedImage && (
         <Modal
           transparent={true}
           animationType="fade"
@@ -178,16 +139,19 @@ const Gallery: React.FC = () => {
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
               <Image
-                source={{uri: selectedImage?.uri}}
+                source={{uri: selectedImage.url}}
                 style={styles.modalImage}
               />
               <Text style={styles.modalTitle}>Detalles de la Imagen</Text>
               <Text style={styles.modalDetailText}>
-                Fecha y hora: {formatDateTime(selectedImage?.data.date ?? '')}
+                Fecha y hora:{' '}
+                {DateTime.fromISO(selectedImage.date).toFormat(
+                  "d 'de' LLL yyyy, HH:mm",
+                )}
               </Text>
               <Text style={styles.modalDetailText}>
-                Ubicación: {selectedImage?.data.latitude},{' '}
-                {selectedImage?.data.longitude}
+                Ubicación: {selectedImage.latitud ?? 'Desconocida'},{' '}
+                {selectedImage.longitud ?? 'Desconocida'}
               </Text>
               <Pressable
                 style={styles.closeButton}
@@ -205,10 +169,7 @@ const Gallery: React.FC = () => {
 export default Gallery;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 10,
-  },
+  container: {flex: 1, padding: 10},
   datePickerContainer: {
     marginBottom: 5,
     padding: 5,
@@ -217,22 +178,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#6a23de',
   },
-  dateText: {
-    fontSize: 16,
-    color: '#6a23de',
-  },
-  gallery: {
-    flex: 1,
-  },
-  imageTouchable: {
-    width: '50%',
-  },
-  image: {
-    width: '95%',
-    height: 150,
-    margin: 5,
-    borderRadius: 8,
-  },
+  dateText: {fontSize: 16, color: '#6a23de'},
+  gallery: {flex: 1},
+  imageTouchable: {width: '50%'},
+  image: {width: '95%', height: 150, margin: 5, borderRadius: 8},
   buttonAdd: {
     borderRadius: 10,
     backgroundColor: '#6a23de',
@@ -240,16 +189,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  /* Estilo para el botón deshabilitado */
-  disabledButton: {
-    backgroundColor: '#999',
-  },
-  textButton: {
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-  /* Modal */
+  textButton: {color: '#fff', textAlign: 'center', fontWeight: '500'},
   modalContainer: {
     flex: 1,
     alignItems: 'center',
@@ -270,11 +210,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     resizeMode: 'cover',
   },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
+  modalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 10},
   modalDetailText: {
     textAlign: 'center',
     fontSize: 16,
@@ -288,9 +224,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 8,
   },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  closeButtonText: {color: '#fff', fontSize: 16, fontWeight: 'bold'},
+  disabledButton: {
+    backgroundColor: '#9E9E9E',
   },
 });

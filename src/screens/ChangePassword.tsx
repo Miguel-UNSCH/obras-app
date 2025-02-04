@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useContext} from 'react';
 import {
   View,
   Text,
@@ -7,35 +7,78 @@ import {
   StyleSheet,
   SafeAreaView,
   ScrollView,
+  Alert,
 } from 'react-native';
-// Ejemplo con IonIcons (instala: npm i react-native-vector-icons)
-// O usa cualquier otra librería de íconos que prefieras
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import {AppContext} from '../context/AppContext';
+import {useNavigation} from '@react-navigation/native';
 
 const ChangePassword = () => {
+  const navigation = useNavigation();
+
+  const {userData, logout} = useContext(AppContext);
   const [currentPassword, setCurrentPassword] = useState('');
   const [secureCurrent, setSecureCurrent] = useState(true);
-
   const [newPassword, setNewPassword] = useState('');
   const [secureNew, setSecureNew] = useState(true);
-
   const [confirmPassword, setConfirmPassword] = useState('');
   const [secureConfirm, setSecureConfirm] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSaveChanges = () => {
-    // Aquí podrías validar contraseñas, conectarte a tu backend, etc.
-    console.log('Cambios guardados');
-    console.log('Contraseña actual:', currentPassword);
-    console.log('Nueva contraseña:', newPassword);
-    console.log('Confirmación:', confirmPassword);
+  const handleSaveChanges = async () => {
+    setError(null);
+    if (newPassword !== confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        'https://geobras.regionayacucho.gob.pe/api/change-password',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            user: userData?.propietario_id,
+            cui: userData?.cui,
+            password: currentPassword,
+            newPassword: newPassword,
+          }),
+        },
+      );
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cambiar la contraseña');
+      }
+
+      Alert.alert('Éxito', 'Contraseña actualizada correctamente', [
+        {
+          text: 'OK',
+          onPress: () => {
+            logout();
+            navigation.navigate('Login' as never);
+          },
+        },
+      ]);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Ocurrió un error inesperado',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Cambiar Contraseña</Text>
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-        {/* Contraseña actual */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Contraseña actual</Text>
           <View style={styles.passwordRow}>
@@ -45,10 +88,9 @@ const ChangePassword = () => {
               value={currentPassword}
               secureTextEntry={secureCurrent}
               placeholder="Ingresa tu contraseña actual"
+              placeholderTextColor="#666"
             />
-            <Pressable
-              style={styles.eyeIcon}
-              onPress={() => setSecureCurrent(!secureCurrent)}>
+            <Pressable onPress={() => setSecureCurrent(!secureCurrent)}>
               <Ionicons
                 name={secureCurrent ? 'eye-off' : 'eye'}
                 size={20}
@@ -58,20 +100,18 @@ const ChangePassword = () => {
           </View>
         </View>
 
-        {/* Nueva contraseña */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Nueva contraseña</Text>
-          <View style={styles.passwordRow}>
+          <View style={styles.passwordRow}>asdaadd
             <TextInput
               style={styles.input}
               onChangeText={setNewPassword}
               value={newPassword}
               secureTextEntry={secureNew}
               placeholder="Ingresa la nueva contraseña"
+              placeholderTextColor="#666"
             />
-            <Pressable
-              style={styles.eyeIcon}
-              onPress={() => setSecureNew(!secureNew)}>
+            <Pressable onPress={() => setSecureNew(!secureNew)}>
               <Ionicons
                 name={secureNew ? 'eye-off' : 'eye'}
                 size={20}
@@ -81,7 +121,6 @@ const ChangePassword = () => {
           </View>
         </View>
 
-        {/* Confirmar nueva contraseña */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Confirmar nueva contraseña</Text>
           <View style={styles.passwordRow}>
@@ -91,10 +130,9 @@ const ChangePassword = () => {
               value={confirmPassword}
               secureTextEntry={secureConfirm}
               placeholder="Confirma la nueva contraseña"
+              placeholderTextColor="#666"
             />
-            <Pressable
-              style={styles.eyeIcon}
-              onPress={() => setSecureConfirm(!secureConfirm)}>
+            <Pressable onPress={() => setSecureConfirm(!secureConfirm)}>
               <Ionicons
                 name={secureConfirm ? 'eye-off' : 'eye'}
                 size={20}
@@ -104,8 +142,13 @@ const ChangePassword = () => {
           </View>
         </View>
 
-        <Pressable style={styles.saveButton} onPress={handleSaveChanges}>
-          <Text style={styles.saveButtonText}>Guardar cambios</Text>
+        <Pressable
+          style={styles.saveButton}
+          onPress={handleSaveChanges}
+          disabled={loading}>
+          <Text style={styles.saveButtonText}>
+            {loading ? 'Guardando...' : 'Guardar cambios'}
+          </Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -143,13 +186,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ccc',
+    paddingHorizontal: 10,
   },
   input: {
     flex: 1,
     padding: 10,
+    fontSize: 16,
+    color: '#333',
   },
-  eyeIcon: {
-    paddingHorizontal: 10,
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 10,
   },
   saveButton: {
     backgroundColor: '#6a23de',

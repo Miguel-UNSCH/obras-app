@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import {
   View,
   Text,
@@ -10,33 +10,31 @@ import {
 
 import IonIcon from '../components/IonIcon';
 import {useNavigation} from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppContext } from '../context/AppContext';
 
 const Settings = () => {
   const navigation = useNavigation();
+  const { userData, logout } = useContext(AppContext);
 
   const handleLogout = async () => {
-    await AsyncStorage.removeItem('isLoggedIn');
+    logout();
     navigation.navigate('Login' as never);
   };
 
   return (
+
     <View style={styles.container}>
       {/* User Information Card */}
       <View style={styles.userCardContainer}>
         <View style={styles.userCard}>
-          <Text style={styles.userName}>Crisante Pariona Silvio</Text>
+          <Text style={styles.userName}>{userData?.name}</Text>
           <Text style={styles.userDetails}>Residente</Text>
-          <Text style={styles.userDetails}>
-            Obra: MEJORAMIENTO Y AMPLIACION DE LOS SERVICIOS DEL SANTUARIO DE LA
-            MEMORIA LA HOYADA EN EL DISTRITO DE ANDRES AVELINO CACERES -
-            PROVINCIA DE HUAMANGA - DEPARTAMENTO DE AYACUCHO
-          </Text>
-          <Text style={styles.userDetails}>CUI: 2449300</Text>
+          <Text style={styles.userDetails}>Obra: {userData?.obra?.name}</Text>
+          <Text style={styles.userDetails}>CUI: {userData?.obra?.cui}</Text>
         </View>
         <Image
           source={{
-            uri: 'https://blinsegur.com/wp-content/uploads/2023/07/blog-Recuperado-1.webp',
+            uri: userData?.image || 'https://blinsegur.com/wp-content/uploads/2023/07/blog-Recuperado-1.webp',
           }}
           style={styles.userImage}
         />

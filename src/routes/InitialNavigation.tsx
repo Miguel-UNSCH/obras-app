@@ -1,56 +1,59 @@
-import React, {useState, useEffect} from 'react';
-import {NavigationContainer} from '@react-navigation/native';
+import React, { useState, useEffect, useContext } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {createStackNavigator} from '@react-navigation/stack';
-import {AppContextProvider} from '../context/AppContext';
+import { createStackNavigator } from '@react-navigation/stack';
+import { AppContext, AppContextProvider } from '../context/AppContext';
 import CarouselScreen from '../screens/CarouselScreen';
 import LoginScreen from '../screens/LoginScreen';
 import BottomNavigation from './bottomNavigation';
+import { ActivityIndicator, View } from 'react-native';
 
 const Stack = createStackNavigator();
 
 const InitialNavigation = () => {
-  const [isLoading, setIsLoading] = useState(true);
+  return (
+    <AppContextProvider>
+      <AuthNavigator />
+    </AppContextProvider>
+  );
+};
+
+const AuthNavigator = () => {
+  const { isLoading, token } = useContext(AppContext);
   const [hasSeenCarousel, setHasSeenCarousel] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [carouselChecked, setCarouselChecked] = useState(false);
 
   useEffect(() => {
-    const checkStatus = async () => {
+    const checkCarouselStatus = async () => {
       const seenCarousel = await AsyncStorage.getItem('hasSeenCarousel');
-      const loggedIn = await AsyncStorage.getItem('isLoggedIn');
       setHasSeenCarousel(seenCarousel === 'true');
-      setIsLoggedIn(loggedIn === 'true');
-      setIsLoading(false);
+      setCarouselChecked(true);
     };
-    checkStatus();
+    checkCarouselStatus();
   }, []);
 
-  if (isLoading) {
-    return null; // Puedes agregar un spinner aquí
+  if (isLoading || !carouselChecked) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#6a23de" />
+      </View>
+    );
   }
 
   const getInitialRoute = () => {
-    if (!hasSeenCarousel) {
-      return 'Carousel';
-    }
-    if (!isLoggedIn) {
-      return 'Login';
-    }
+    if (!hasSeenCarousel) return 'Carousel';
+    if (!token) return 'Login';
     return 'Main';
   };
 
   return (
-    <AppContextProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          screenOptions={{headerShown: false}}
-          initialRouteName={getInitialRoute()}>
-          <Stack.Screen name="Carousel" component={CarouselScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Main" component={BottomNavigation} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </AppContextProvider>
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={getInitialRoute()}>
+        <Stack.Screen name="Carousel" component={CarouselScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+        <Stack.Screen name="Main" component={BottomNavigation} />
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 };
 
