@@ -1,6 +1,6 @@
 import {Alert} from 'react-native';
 
-const UPLOAD_URL = 'http://172.16.21.194:3000/api/uploads';
+const UPLOAD_URL = 'https://geobras.regionayacucho.gob.pe/api/uploads';
 
 export interface PhotoDetail {
   uri: string;
@@ -20,22 +20,31 @@ export const uploadPhotosToServer = async (
 
     for (const photo of photos) {
       const formData = new FormData();
+
+      // Nombre seguro para el archivo
+      const fileName = `upload_${Date.now()}.jpg`;
+
       formData.append('file', {
-        uri: photo.uri,
-        name: photo.uri.split('/').pop(),
+        uri: photo.uri.startsWith('file://')
+          ? photo.uri
+          : `file://${photo.uri}`,
+        name: fileName,
         type: 'image/jpeg',
       });
+
       formData.append('id', propietarioId);
       formData.append('cui', cui);
       formData.append('latitud', String(photo.latitude ?? '0'));
       formData.append('longitud', String(photo.longitude ?? '0'));
       formData.append('date', new Date(photo.timestamp).toISOString());
 
+      console.log('Enviando FormData:', formData);
+
       const response = await fetch(UPLOAD_URL, {
         method: 'POST',
         body: formData,
         headers: {
-          'Content-Type': 'multipart/form-data',
+          Accept: 'application/json',
         },
       });
 

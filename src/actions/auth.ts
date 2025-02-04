@@ -20,7 +20,6 @@ export const authLogin = async (user: string, password: string) => {
 
     if (axios.isAxiosError(error)) {
       if (error.response) {
-        // Si el error tiene una respuesta del servidor (error 404, 401, 500, etc.)
         console.log('Detalles del error:', error.response.data);
 
         throw new Error(
@@ -29,7 +28,6 @@ export const authLogin = async (user: string, password: string) => {
           `Error ${error.response.status}: ${error.response.statusText}`
         );
       } else if (error.request) {
-        // Si la solicitud fue hecha pero no se recibió respuesta
         throw new Error('No se recibió respuesta del servidor. Verifica tu conexión.');
       }
     }

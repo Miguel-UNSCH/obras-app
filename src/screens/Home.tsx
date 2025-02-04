@@ -22,6 +22,11 @@ interface Region {
   longitudeDelta: number;
 }
 
+interface Coordinate {
+  latitude: number;
+  longitude: number;
+}
+
 // Función para obtener el centro aproximado del polígono
 function getPolygonCenter(coords: {latitude: number; longitude: number}[]) {
   let latSum = 0;
@@ -55,6 +60,38 @@ const isPointInPolygon = (
     }
   }
   return inside;
+};
+
+const getDistanceFromLine = (
+  lat: number,
+  lng: number,
+  line: Coordinate[],
+): number => {
+  if (!line || line.length < 2) {
+    return Infinity;
+  }
+
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const R = 6371000; // Radio de la Tierra en metros
+  let minDistance = Infinity;
+
+  for (let i = 0; i < line.length - 1; i++) {
+    const lat1 = toRad(line[i].latitude);
+    const lon1 = toRad(line[i].longitude);
+    const lat2 = toRad(line[i + 1].latitude);
+    const lon2 = toRad(line[i + 1].longitude);
+
+    const dLat = lat2 - lat1;
+    const dLon = lon2 - lon1;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const d1 = R * c;
+
+    minDistance = Math.min(minDistance, d1);
+  }
+  return minDistance;
 };
 
 const Home = () => {
@@ -112,14 +149,19 @@ const Home = () => {
     Geolocation.watchPosition(
       position => {
         const {latitude, longitude} = position.coords;
-        setRegion(prev => ({
-          ...prev,
-          latitude,
-          longitude,
-        }));
+        setRegion(prev => ({...prev, latitude, longitude}));
 
-        // Verificamos si está dentro del polígono
-        const inside = isPointInPolygon(latitude, longitude, coordinates || []);
+        let inside = false;
+        if (userData?.obra?.projectType === 'Superficie') {
+          inside = isPointInPolygon(latitude, longitude, coordinates || []);
+        } else {
+          const distance = getDistanceFromLine(
+            latitude,
+            longitude,
+            coordinates || [],
+          );
+          inside = distance <= 150;
+        }
         setIsInArea(inside);
       },
       error => {

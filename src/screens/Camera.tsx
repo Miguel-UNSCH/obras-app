@@ -17,7 +17,7 @@ import {PhotoDetail, uploadPhotosToServer} from '../actions/upload';
 const LOCAL_STORAGE_KEY = 'my_photos';
 
 const Camera = () => {
-  const {userData} = useContext(AppContext);
+  const {userData, isInArea} = useContext(AppContext);
   const [photos, setPhotos] = useState<PhotoDetail[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
 
@@ -60,9 +60,10 @@ const Camera = () => {
     try {
       const photo = await CameraAdapter.takePicture();
       if (photo) {
+        const timestamp = Number(photo.timestamp);
         const formattedPhoto: PhotoDetail = {
           ...photo,
-          timestamp: Number(photo.timestamp),
+          timestamp: !isNaN(timestamp) ? timestamp : Date.now(),
           latitude: photo.latitude ?? undefined,
           longitude: photo.longitude ?? undefined,
         };
@@ -128,7 +129,7 @@ const Camera = () => {
         contentContainerStyle={styles.list}
       />
 
-      <Pressable style={styles.cameraButton} onPress={takePicture}>
+      <Pressable style={[styles.cameraButton, !isInArea && styles.disabledButton]} onPress={takePicture} disabled={!isInArea}>
         <Text style={styles.cameraText}>Tomar una foto</Text>
       </Pressable>
 

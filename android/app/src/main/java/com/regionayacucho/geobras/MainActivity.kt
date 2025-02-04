@@ -1,4 +1,4 @@
-package com.obrasapp
+package com.regionayacucho.geobras
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

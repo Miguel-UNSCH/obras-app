@@ -133,6 +133,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: '#fff',
     fontSize: 16,
+    color: '#333',
   },
   passwordContainer: {
     width: '100%',
@@ -149,6 +150,7 @@ const styles = StyleSheet.create({
     height: 50,
     paddingHorizontal: 15,
     fontSize: 16,
+    color: '#333',
   },
   togglePasswordButton: {
     paddingHorizontal: 10,

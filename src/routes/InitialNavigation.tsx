@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createStackNavigator } from '@react-navigation/stack';
 import { AppContext, AppContextProvider } from '../context/AppContext';
 import CarouselScreen from '../screens/CarouselScreen';
@@ -20,19 +19,8 @@ const InitialNavigation = () => {
 
 const AuthNavigator = () => {
   const { isLoading, token } = useContext(AppContext);
-  const [hasSeenCarousel, setHasSeenCarousel] = useState(false);
-  const [carouselChecked, setCarouselChecked] = useState(false);
 
-  useEffect(() => {
-    const checkCarouselStatus = async () => {
-      const seenCarousel = await AsyncStorage.getItem('hasSeenCarousel');
-      setHasSeenCarousel(seenCarousel === 'true');
-      setCarouselChecked(true);
-    };
-    checkCarouselStatus();
-  }, []);
-
-  if (isLoading || !carouselChecked) {
+  if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#6a23de" />
@@ -40,15 +28,9 @@ const AuthNavigator = () => {
     );
   }
 
-  const getInitialRoute = () => {
-    if (!hasSeenCarousel) return 'Carousel';
-    if (!token) return 'Login';
-    return 'Main';
-  };
-
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={getInitialRoute()}>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={token ? 'Main' : 'Carousel'}>
         <Stack.Screen name="Carousel" component={CarouselScreen} />
         <Stack.Screen name="Login" component={LoginScreen} />
         <Stack.Screen name="Main" component={BottomNavigation} />

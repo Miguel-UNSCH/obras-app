@@ -90,6 +90,7 @@ export const AppContextProvider: React.FC<{children: React.ReactNode}> = ({
   }, []);
 
   const login = async (user: string, password: string) => {
+
     try {
       const response = await authLogin(user, password);
 
@@ -102,6 +103,7 @@ export const AppContextProvider: React.FC<{children: React.ReactNode}> = ({
         setUserData(response.user);
 
         // ✅ Guardar coordenadas en el estado
+
         if (response.user.obra?.points) {
           try {
             const parsedPoints = JSON.parse(response.user.obra.points).map(

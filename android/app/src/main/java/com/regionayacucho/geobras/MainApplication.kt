@@ -1,4 +1,4 @@
-package com.obrasapp
+package com.regionayacucho.geobras
 
 import android.app.Application
 import com.facebook.react.PackageList

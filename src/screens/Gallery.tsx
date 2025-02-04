@@ -10,9 +10,7 @@ import {
   Pressable,
   ActivityIndicator,
 } from 'react-native';
-import DatePicker, {
-  DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
+import DatePicker, {DateTimePickerEvent} from '@react-native-community/datetimepicker';
 import {DateTime, Settings} from 'luxon';
 import {useNavigation} from '@react-navigation/native';
 import {AppContext} from '../context/AppContext';
@@ -29,38 +27,40 @@ interface ImageItem {
 
 const Gallery: React.FC = () => {
   const navigation = useNavigation();
-  const {userData, isInArea} = useContext(AppContext);
+  const {userData} = useContext(AppContext);
 
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState<boolean>(false);
   const [images, setImages] = useState<ImageItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [selectedImage, setSelectedImage] = useState<ImageItem | null>(null);
 
-  const fetchImages = useCallback(async () => {
+  const isToday = DateTime.fromJSDate(selectedDate).hasSame(DateTime.now(), 'day');
+
+  const fetchImages = useCallback(async (manualRefresh = false) => {
+    if (manualRefresh) setRefreshing(true);
     setLoading(true);
     try {
-      const response = await fetch(
-        'https://geobras.regionayacucho.gob.pe/api/images',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id: userData?.propietario_id,
-            cui: userData?.cui,
-            date: DateTime.fromJSDate(selectedDate).toFormat('yyyy-MM-dd'),
-          }),
+      const response = await fetch('https://geobras.regionayacucho.gob.pe/api/images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          id: userData?.propietario_id,
+          cui: userData?.cui,
+          date: DateTime.fromJSDate(selectedDate).toFormat('yyyy-MM-dd'),
+        }),
+      });
       const data: ImageItem[] = await response.json();
       setImages(data);
     } catch (error) {
       console.error('Error fetching images:', error);
     }
     setLoading(false);
+    if (manualRefresh) setRefreshing(false);
   }, [userData?.propietario_id, userData?.cui, selectedDate]);
 
   useEffect(() => {
@@ -84,9 +84,7 @@ const Gallery: React.FC = () => {
   };
 
   const renderImageItem = ({item}: {item: ImageItem}) => (
-    <TouchableOpacity
-      onPress={() => handleImageClick(item)}
-      style={styles.imageTouchable}>
+    <TouchableOpacity onPress={() => handleImageClick(item)} style={styles.imageTouchable}>
       <Image source={{uri: item.url}} style={styles.image} />
     </TouchableOpacity>
   );
@@ -94,20 +92,13 @@ const Gallery: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.datePickerContainer}>
-        <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+        <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePicker}>
           <Text style={styles.dateText}>
-            {DateTime.fromJSDate(selectedDate).toFormat(
-              "d 'de' LLLL 'del' yyyy",
-            )}
+            {DateTime.fromJSDate(selectedDate).toFormat("d 'de' LLLL 'del' yyyy")}
           </Text>
         </TouchableOpacity>
         {showDatePicker && (
-          <DatePicker
-            value={selectedDate}
-            mode="date"
-            display="calendar"
-            onChange={handleDateChange}
-          />
+          <DatePicker value={selectedDate} mode="date" display="calendar" onChange={handleDateChange} />
         )}
       </View>
 
@@ -120,42 +111,36 @@ const Gallery: React.FC = () => {
           keyExtractor={item => item.id}
           numColumns={2}
           style={styles.gallery}
+          onRefresh={() => fetchImages(true)}
+          refreshing={refreshing}
         />
       )}
 
+      <Pressable onPress={() => fetchImages(true)} style={styles.refreshButton}>
+        <Text style={styles.textButton}>Actualizar</Text>
+      </Pressable>
+
       <Pressable
         onPress={handleAddImage}
-        style={[styles.buttonAdd, !isInArea && styles.disabledButton]}
-        disabled={!isInArea}>
+        style={[styles.buttonAdd, !isToday && styles.disabledButton]}
+        disabled={!isToday}>
         <Text style={styles.textButton}>Agregar imagen</Text>
       </Pressable>
 
       {modalVisible && selectedImage && (
-        <Modal
-          transparent={true}
-          animationType="fade"
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}>
+        <Modal transparent={true} animationType="fade" visible={modalVisible} onRequestClose={() => setModalVisible(false)}>
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
-              <Image
-                source={{uri: selectedImage.url}}
-                style={styles.modalImage}
-              />
+              <Image source={{uri: selectedImage.url}} style={styles.modalImage} />
               <Text style={styles.modalTitle}>Detalles de la Imagen</Text>
               <Text style={styles.modalDetailText}>
                 Fecha y hora:{' '}
-                {DateTime.fromISO(selectedImage.date).toFormat(
-                  "d 'de' LLL yyyy, HH:mm",
-                )}
+                {DateTime.fromISO(selectedImage.date).toFormat("d 'de' LLL yyyy, HH:mm")}
               </Text>
               <Text style={styles.modalDetailText}>
-                Ubicación: {selectedImage.latitud ?? 'Desconocida'},{' '}
-                {selectedImage.longitud ?? 'Desconocida'}
+                Ubicación: {selectedImage.latitud ?? 'Desconocida'}, {selectedImage.longitud ?? 'Desconocida'}
               </Text>
-              <Pressable
-                style={styles.closeButton}
-                onPress={() => setModalVisible(false)}>
+              <Pressable style={styles.closeButton} onPress={() => setModalVisible(false)}>
                 <Text style={styles.closeButtonText}>Cerrar</Text>
               </Pressable>
             </View>
@@ -172,6 +157,8 @@ const styles = StyleSheet.create({
   container: {flex: 1, padding: 10},
   datePickerContainer: {
     marginBottom: 5,
+  },
+  datePicker: {
     padding: 5,
     borderRadius: 10,
     alignItems: 'center',
@@ -188,6 +175,15 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 10,
+  },
+  refreshButton: {
+    borderRadius: 10,
+    backgroundColor: '#3498db',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 10,
   },
   textButton: {color: '#fff', textAlign: 'center', fontWeight: '500'},
   modalContainer: {
@@ -211,12 +207,7 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   modalTitle: {fontSize: 18, fontWeight: 'bold', marginBottom: 10},
-  modalDetailText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 6,
-  },
+  modalDetailText: {textAlign: 'center', fontSize: 16, color: '#333', marginBottom: 6},
   closeButton: {
     marginTop: 20,
     backgroundColor: '#6a23de',
@@ -225,7 +216,5 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   closeButtonText: {color: '#fff', fontSize: 16, fontWeight: 'bold'},
-  disabledButton: {
-    backgroundColor: '#9E9E9E',
-  },
+  disabledButton: {backgroundColor: '#9E9E9E'},
 });
